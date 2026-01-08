@@ -1,1 +1,1 @@
-export { CommentSection } from "./Comment-Section";
+export { CommentSection } from "./comment-section";

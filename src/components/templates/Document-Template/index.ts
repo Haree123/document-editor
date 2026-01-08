@@ -1,1 +1,1 @@
-export { DocumentTemplate } from "./Document-Template";
+export { DocumentTemplate } from "./document-template";

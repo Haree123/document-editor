@@ -1,1 +1,1 @@
-export { CommentForm } from "./Comment-Form";
+export { CommentForm } from "./comment-form";

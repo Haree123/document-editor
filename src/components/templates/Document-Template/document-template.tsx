@@ -15,11 +15,7 @@ import "react-virtualized/styles.css";
 
 import { Badge } from "@components/atoms";
 import { Block } from "@components/organisms";
-import type {
-  DocumentState,
-  AIAction,
-  Block as BlockType,
-} from "@customTypes/index";
+import type { DocumentState, AIAction } from "@customTypes/index";
 
 interface DocumentTemplateProps {
   document: DocumentState;
@@ -186,8 +182,6 @@ export const DocumentTemplate: React.FC<DocumentTemplateProps> = ({
       style: React.CSSProperties;
     }) => {
       const block = blocks[index];
-      const isEditing = expandedBlocks.has(`edit-${block.id}`);
-      const hasCommentsOpen = expandedBlocks.has(`comments-${block.id}`);
 
       return (
         <CellMeasurer

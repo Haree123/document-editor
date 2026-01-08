@@ -1,1 +1,1 @@
-export { ListEditor } from "./list-editor";
+export { ListEditor } from "./List-Editor";

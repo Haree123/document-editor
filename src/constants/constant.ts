@@ -2,6 +2,8 @@ export const DEFAULT_AUTHOR = "Anonymous";
 
 export const AI_ACTION_DELAY = 1500; // ms
 
+export const DEFAULT_DEBOUNCE_DELAY = 300; // ms
+
 export const PERFORMANCE_THRESHOLDS = {
   LARGE_DOCUMENT: 50,
   VERY_LARGE_DOCUMENT: 100,

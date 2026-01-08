@@ -1,1 +1,1 @@
-export { BlockContent } from "./Block-Content";
+export { BlockContent } from "./block-content";

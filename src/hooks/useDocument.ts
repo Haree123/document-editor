@@ -1,9 +1,8 @@
-import { useState, useCallback, useRef } from "react";
-import { debounce } from "@utils/index";
+import { useState, useCallback, useRef, useEffect } from "react";
 
-import { generateId } from "@utils/index";
-import { getDefaultDocument } from "@utils/index";
-import type { DocumentState, DocComment, AIAction } from "@customTypes/index";
+import type { DocumentState, AIAction } from "@customTypes/index";
+import { getDefaultDocument, generateId } from "@utils/index";
+import { DEFAULT_DEBOUNCE_DELAY } from "@constants/index";
 
 interface UseDocumentProps {
   initialDocument?: DocumentState;
@@ -24,33 +23,35 @@ export const useDocument = ({
     () => initialDocument || getDefaultDocument()
   );
 
-  // Debounced update to reduce re-renders
-  const debouncedUpdate = useRef(
-    debounce((blockId: string, content: string) => {
+  const updateTimeoutRef = useRef<number | null>(null);
+
+  const debouncedUpdate = useCallback((blockId: string, content: string) => {
+    if (updateTimeoutRef.current !== null) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+
+    updateTimeoutRef.current = window.setTimeout(() => {
       setDocument((prev) => {
         const block = prev.blocks[blockId];
         if (!block || !block.isEditable) return prev;
 
         let updatedBlock;
-
         if (block.type === "paragraph" || block.type === "heading") {
           updatedBlock = { ...block, content };
         } else if (block.type === "list") {
-          const items = content
-            .split("\n")
-            .map((item) => item.trim())
-            .filter(Boolean);
-          updatedBlock = { ...block, items };
+          updatedBlock = {
+            ...block,
+            items: content.split("\n").filter(Boolean),
+          };
         } else if (block.type === "table") {
           try {
-            const tableData = JSON.parse(content);
+            const parsed = JSON.parse(content);
             updatedBlock = {
               ...block,
-              headers: tableData.headers,
-              rows: tableData.rows,
+              headers: parsed.headers || block.headers,
+              rows: parsed.rows || block.rows,
             };
-          } catch (error) {
-            console.error("Failed to parse table data:", error);
+          } catch {
             return prev;
           }
         } else {
@@ -65,17 +66,29 @@ export const useDocument = ({
           },
         };
       });
-    }, 300) // 300ms debounce
-  ).current;
+    }, DEFAULT_DEBOUNCE_DELAY);
+  }, []);
 
-  const handleBlockUpdate = useCallback((blockId: string, content: string) => {
-    debouncedUpdate(blockId, content);
-  }, [debouncedUpdate]);
+  const handleBlockUpdate = useCallback(
+    (blockId: string, content: string) => {
+      debouncedUpdate(blockId, content);
+    },
+    [debouncedUpdate]
+  );
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current !== null) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleAddComment = useCallback(
     (blockId: string, content: string, author: string) => {
       const commentId = generateId();
-      const newComment: DocComment = {
+      const newComment = {
         id: commentId,
         blockId,
         content,
