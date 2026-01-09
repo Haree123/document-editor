@@ -107,10 +107,4 @@ src/
 
 - **AI Actions**: Currently simulated with text prefixes (`[AI Summary]`, `[AI Enhanced]`). The architecture supports easy integration with real AI APIs (OpenAI, Claude, etc.) by updating the `handleAIAction` function in `useDocument` hook.
 
-## 📄 License
-
-MIT
-
----
-
 Built with ⚡ for performance assessment
