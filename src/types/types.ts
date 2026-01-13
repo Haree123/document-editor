@@ -47,4 +47,14 @@ export interface DocumentState {
   comments: Record<string, DocComment[]>;
 }
 
+export interface DocumentHistory {
+  past: DocumentState[];
+  present: DocumentState[];
+}
+
+export interface EditorState {
+  document: DocumentState;
+  history: DocumentHistory;
+}
+
 export type AIAction = "improve" | "summarize";

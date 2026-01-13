@@ -71,6 +71,21 @@ Component-level memoization (implemented)”
 “Virtual scroll cache (applicable when virtualization is enabled)”
 “Render batching considerations for dynamic layouts”
 
+### History Management
+The editor maintains an **in-memory undo/redo history** with a maximum cap of **200 states**.
+
+**Why limit to 200?**
+
+- ✅ **Memory efficiency** - Each state contains the full document snapshot, so unlimited history could consume excessive memory
+- ✅ **Performance** - Keeps history operations fast and predictable
+- ✅ **Practical limit** - 200 undos covers virtually all real-world editing sessions
+- ⚠️ **Client-side constraint** - Browser memory is limited; for enterprise needs requiring unlimited history, implement **server-side persistence** with database storage
+
+**For unlimited history:** Store each document change as a versioned record in your backend database (e.g., PostgreSQL with JSONB columns, MongoDB change streams, or dedicated versioning systems like Git-based solutions).
+
+```typescript
+const MAX_HISTORY = 200; // Client-side undo/redo limit
+
 ```
 src/
 ├── components/
