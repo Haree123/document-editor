@@ -4,6 +4,7 @@ import type { DocumentState, AIAction } from "@customTypes/index";
 import { getDefaultDocument, generateId } from "@utils/index";
 import { DEFAULT_DEBOUNCE_DELAY } from "@constants/index";
 
+const MAX_HISTORY = 200;
 interface UseDocumentProps {
   initialDocument?: DocumentState;
 }
@@ -14,16 +15,46 @@ interface UseDocumentReturn {
   handleAddComment: (blockId: string, content: string, author: string) => void;
   handleDeleteComment: (blockId: string, commentId: string) => void;
   handleAIAction: (blockId: string, action: AIAction) => Promise<void>;
+  redo: () => void;
+  undo: () => void;
 }
 
 export const useDocument = ({
   initialDocument,
 }: UseDocumentProps = {}): UseDocumentReturn => {
-  const [document, setDocument] = useState<DocumentState>(
-    () => initialDocument || getDefaultDocument()
-  );
-
+  const [state, setState] = useState(() => ({
+    document: initialDocument || getDefaultDocument(),
+    past: [] as DocumentState[],
+    present: [] as DocumentState[],
+  }));
+  console.log(state);
+  const document = state.document;
+  const isUndoRedoRef = useRef(false);
   const updateTimeoutRef = useRef<number | null>(null);
+
+  const cancelPendingUpdate = () => {
+    if (updateTimeoutRef.current !== null) {
+      clearTimeout(updateTimeoutRef.current);
+      updateTimeoutRef.current = null;
+    }
+  };
+
+  const commit = useCallback(
+    (next: DocumentState) => {
+      cancelPendingUpdate();
+
+      setState((prev) => {
+        const newPast = [...prev.past, prev.document];
+
+        return {
+          document: next,
+          past: newPast.slice(-MAX_HISTORY),
+          present: [],
+        };
+      });
+    },
+    [cancelPendingUpdate]
+  );
 
   const debouncedUpdate = useCallback((blockId: string, content: string) => {
     if (updateTimeoutRef.current !== null) {
@@ -31,11 +62,12 @@ export const useDocument = ({
     }
 
     updateTimeoutRef.current = window.setTimeout(() => {
-      setDocument((prev) => {
-        const block = prev.blocks[blockId];
+      setState((prev) => {
+        const block = prev.document.blocks[blockId];
         if (!block || !block.isEditable) return prev;
 
-        let updatedBlock;
+        let updatedBlock = block;
+
         if (block.type === "paragraph" || block.type === "heading") {
           updatedBlock = { ...block, content };
         } else if (block.type === "list") {
@@ -58,12 +90,18 @@ export const useDocument = ({
           return prev;
         }
 
-        return {
-          ...prev,
+        const next: DocumentState = {
+          ...prev.document,
           blocks: {
-            ...prev.blocks,
+            ...prev.document.blocks,
             [blockId]: updatedBlock,
           },
+        };
+
+        return {
+          document: next,
+          past: [...prev.past, prev.document].slice(-MAX_HISTORY),
+          present: [],
         };
       });
     }, DEFAULT_DEBOUNCE_DELAY);
@@ -96,30 +134,30 @@ export const useDocument = ({
         timestamp: new Date().toISOString(),
       };
 
-      setDocument((prev) => ({
-        ...prev,
+      commit({
+        ...state.document,
         comments: {
-          ...prev.comments,
-          [blockId]: [...(prev.comments[blockId] || []), newComment],
+          ...state.document.comments,
+          [blockId]: [...(state.document.comments[blockId] || []), newComment],
         },
-      }));
+      });
     },
-    []
+    [state.document, commit]
   );
 
   const handleDeleteComment = useCallback(
     (blockId: string, commentId: string) => {
-      setDocument((prev) => ({
-        ...prev,
+      commit({
+        ...state.document,
         comments: {
-          ...prev.comments,
-          [blockId]: (prev.comments[blockId] || []).filter(
-            (comment) => comment.id !== commentId
+          ...state.document.comments,
+          [blockId]: (state.document.comments[blockId] || []).filter(
+            (c) => c.id !== commentId
           ),
         },
-      }));
+      });
     },
-    []
+    [state.document, commit]
   );
 
   const handleAIAction = useCallback(
@@ -150,11 +188,82 @@ export const useDocument = ({
     [document.blocks, handleBlockUpdate]
   );
 
+  const undo = useCallback(() => {
+    cancelPendingUpdate();
+    isUndoRedoRef.current = true;
+
+    setState((prev) => {
+      if (!prev.past.length) return prev;
+
+      const previous = prev.past[prev.past.length - 1];
+
+      return {
+        document: previous,
+        past: prev.past.slice(0, -1),
+        present: [prev.document, ...prev.present],
+      };
+    });
+  }, [cancelPendingUpdate]);
+
+  const redo = useCallback(() => {
+    cancelPendingUpdate();
+    isUndoRedoRef.current = true;
+
+    setState((prev) => {
+      if (prev.present.length === 0) return prev;
+
+      const next = prev.present[0];
+      const newPresent = prev.present.slice(1);
+
+      return {
+        document: next,
+        past: [...prev.past, prev.document].slice(-MAX_HISTORY),
+        present: newPresent,
+      };
+    });
+  }, [cancelPendingUpdate]);
+
+  useEffect(() => {
+    isUndoRedoRef.current = false;
+  }, [state.document]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === "y" || (e.shiftKey && e.key === "z")) {
+          e.preventDefault();
+          redo();
+          return;
+        }
+
+        if (e.key === "z") {
+          e.preventDefault();
+          undo();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [redo, undo]);
+
+  useEffect(() => {
+    cancelPendingUpdate();
+
+    setState({
+      document: initialDocument || getDefaultDocument(),
+      past: [],
+      present: [],
+    });
+  }, [initialDocument]);
+
   return {
     document,
     handleBlockUpdate,
     handleAddComment,
     handleDeleteComment,
     handleAIAction,
+    redo,
+    undo,
   };
 };
